@@ -2,9 +2,11 @@
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-Take a photo on your phone, tap once, type `/vis` in any Claude session. That's it.
+**A `/vis` command for [Claude Code](https://claude.com/claude-code).** Take a photo on your
+phone, tap once, and it's in your session — no cloud round-trip, no copying paths.
 
-Replaces: shoot → cloud storage → download on the PC → find the file → copy the path → paste.
+Replaces: shoot → upload to cloud storage → download on the PC → find the file → copy the
+path → paste it into the prompt.
 
 Runs on macOS, Linux and Windows + WSL. Zero dependencies, nothing leaves your network.
 
@@ -20,11 +22,15 @@ Runs on macOS, Linux and Windows + WSL. Zero dependencies, nothing leaves your n
 
 ## Installing
 
-Works on **macOS**, **Linux** and **Windows + WSL**. Requirements are the same everywhere:
-Node (any recent version — the project has **zero dependencies**, so there is nothing to
-`npm install`), and the phone on the **same Wi-Fi** as the computer.
+Works on **macOS**, **Linux** and **Windows + WSL**. You need:
 
-Windows is the only one with a wrinkle, covered below.
+- **[Claude Code](https://claude.com/claude-code)** — this installs a `/vis` slash command
+  into it. It's an extension to Claude Code, not a standalone tool.
+- **Node**, any recent version. The project has **zero dependencies**, so there is nothing to
+  `npm install`.
+- Your **phone on the same Wi-Fi** as the computer.
+
+Windows is the only platform with a wrinkle, covered below.
 
 ### Common steps
 
