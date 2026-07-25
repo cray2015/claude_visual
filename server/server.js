@@ -3,10 +3,13 @@
 
 // claude_visual receiver.
 //
-// Runs under *Windows* node.exe (C:\Program Files\nodejs\node.exe) on purpose:
-// it binds the machine's real LAN address directly, so the phone can reach it
-// with no netsh portproxy and no WSL networking changes. Files land in
-// D:\code\claude_visual\inbox, which WSL sees as /mnt/d/code/claude_visual/inbox.
+// Runs wherever it can bind the machine's real LAN address, so the phone
+// reaches it with no netsh portproxy and no WSL networking changes.
+//
+// On macOS, Linux, and WSL with *mirrored* networking, that is just here.
+// On WSL with the default NAT networking it is not — WSL has its own private
+// subnet — so there the receiver runs under Windows node.exe instead, and the
+// inbox it writes to (D:\...\inbox) is the one WSL reads as /mnt/d/.../inbox.
 
 const http = require('http');
 const fs = require('fs');

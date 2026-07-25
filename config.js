@@ -12,10 +12,15 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname);
 
-// Which world are we in? On Windows+WSL the receiver runs as a Windows process
-// while the claim script runs in WSL, so the two halves see different path
-// forms and need different launch instructions. On macOS and Linux there is no
-// split at all — one process, one path form.
+// Which world are we in? On Windows+WSL with the default NAT networking the
+// receiver runs as a Windows process while the claim script runs in WSL, so the
+// two halves see different path forms and need different launch instructions.
+// On macOS and Linux there is no split at all — one process, one path form.
+//
+// WSL is not always split, though: under *mirrored* networking (Windows 11
+// 22H2+) WSL shares the host's network interfaces, so a server bound inside WSL
+// is reachable from the phone directly and WSL behaves like plain Linux. See
+// isSplit below — that, not isWSL, is the predicate the rest of the code wants.
 //
 // Note this file is loaded by BOTH halves, so detection has to work when
 // running under Windows node (process.platform === 'win32') and under WSL node.
@@ -39,9 +44,8 @@ const isMac     = forced ? forced === 'mac'     : process.platform === 'darwin';
 const isWSL     = forced ? forced === 'wsl'     : detectWSL();
 const isLinux   = forced ? forced === 'linux'   : (process.platform === 'linux' && !isWSL);
 
-// True when the receiver and the claim script are the same OS — i.e. everywhere
-// except the Windows+WSL pairing.
-const isNative = isMac || isLinux;
+// isNative/isSplit are filled in below, once loadEnv and str() exist — the
+// mirrored-vs-NAT answer comes from .env.
 
 // Deliberately hand-rolled rather than process.loadEnvFile(): it keeps the
 // precedence rule explicit (real env wins) and works on any Node version.
@@ -85,6 +89,22 @@ const str = (key, dflt) => {
   return raw === undefined || raw === '' ? dflt : raw;
 };
 
+// WSL networking mode: 'nat' (the default WSL2 behaviour) or 'mirrored'.
+// bin/install.js probes for this once and records the answer here, because
+// finding out for real means asking Windows for its IP list — about a second,
+// which is far too slow for a file that loads on every single /vis.
+//
+// Defaulting to 'nat' when unset is deliberate: the Windows-side receiver works
+// under BOTH modes, so guessing wrong that way costs a little ceremony, whereas
+// wrongly assuming 'mirrored' produces a server the phone cannot reach.
+const wslNet = String(str('CLAUDE_VISUAL_WSL_NET', 'nat')).toLowerCase();
+const isMirroredWSL = isWSL && wslNet === 'mirrored';
+
+// The question almost every caller actually has is "are the receiver and the
+// claim script separated by an OS boundary?" — not "is this WSL?".
+const isSplit  = isWSL && !isMirroredWSL;
+const isNative = isMac || isLinux || isMirroredWSL;
+
 // Inbox/archive are configured as names relative to the project root, never as
 // absolute paths: the same value has to resolve for Windows node (D:\...) and
 // WSL node (/mnt/d/...), and only a relative name does that.
@@ -92,7 +112,7 @@ const inboxDir   = str('CLAUDE_VISUAL_INBOX_DIR', 'inbox');
 const archiveDir = str('CLAUDE_VISUAL_ARCHIVE_DIR', 'archive');
 
 module.exports = {
-  platform: { isWindows, isMac, isLinux, isWSL, isNative },
+  platform: { isWindows, isMac, isLinux, isWSL, isNative, isSplit, isMirroredWSL },
 
   root:      ROOT,
   inbox:     path.join(ROOT, inboxDir),

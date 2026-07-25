@@ -109,14 +109,14 @@ function claim(items) {
   return claimed;
 }
 
-// Under WSL the receiver is a *Windows* process, so the "start it" hint has to
-// be a Windows path (/mnt/d/... -> D:\...) rather than the WSL one. Everywhere
-// else the shell script is the answer.
+// On NAT'd WSL the receiver is a *Windows* process, so the "start it" hint has
+// to be a Windows path (/mnt/d/... -> D:\...) rather than the WSL one. Under
+// mirrored WSL — and everywhere else — the shell script is the answer.
 function winPath(p) {
   const m = /^\/mnt\/([a-z])\/(.*)$/.exec(p);
   return m ? `${m[1].toUpperCase()}:\\${m[2].replace(/\//g, '\\')}` : p;
 }
-const STARTER = cfg.platform.isWSL
+const STARTER = cfg.platform.isSplit
   ? winPath(cfg.root) + '\\start-server.cmd'
   : path.join(cfg.root, 'start-server.sh');
 

@@ -144,8 +144,10 @@ logout.
 **Read this first:** two different environments are involved. You install from **WSL**, but
 the receiver runs on **Windows**. Watch the icon on each step — 💻 means WSL, 🪟 means Windows.
 
-*(Why: WSL2 sits behind its own private network, so a server started inside WSL isn't
-reachable from your phone. Running it on the Windows side avoids that entirely.)*
+*(Why: by default WSL sits on its own private network, so a server started inside WSL isn't
+reachable from your phone. Running it on the Windows side avoids that entirely — and works
+no matter how your WSL networking is set up, which is why these steps don't ask you to
+check.)*
 
 1. 🪟 **Windows** — install **Node for Windows** from [nodejs.org](https://nodejs.org).
    You need Node on *both* sides; having it in WSL only is not enough.
@@ -193,6 +195,31 @@ New-NetFirewallRule -DisplayName "claude_visual" -Direction Inbound `
 
 Both profiles, because home Wi-Fi is often categorised Public rather than Private — check
 with `Get-NetConnectionProfile`.
+</details>
+
+<details>
+<summary>If WSL Settings says your networking mode is "Mirrored"</summary>
+
+Windows 11 22H2+ offers a **Mirrored** networking mode (**WSL Settings → Networking →
+Networking mode**), in which WSL shares this PC's network interfaces instead of getting a
+private subnet of its own. If that's what you're on, your phone can reach a server running
+*inside* WSL, so the Windows half above is optional.
+
+**The steps above still work under Mirrored** — nothing to undo. But if you'd rather keep
+everything in one terminal, follow the [Linux](#linux) walkthrough instead: no Node on the
+Windows side, and the project can live anywhere, including `~/code/`.
+
+`node bin/install.js` detects which mode you're on and adapts on its own — it compares the
+addresses WSL can see against the ones Windows reports, so it's right regardless of whether
+you set the mode in `.wslconfig` or through the Settings app. It prints what it found. If it
+ever gets it wrong, override it in `.env`:
+
+```bash
+CLAUDE_VISUAL_WSL_NET=mirrored   # or: nat
+```
+
+Either way you may still need the firewall rule above — Mirrored WSL is firewalled by the
+Windows host, not by the Linux side.
 </details>
 
 ---

@@ -9,11 +9,13 @@
 // and creates .env from the example. Idempotent — safe to re-run after moving
 // the project.
 //
-// Two shapes of install:
-//   Windows + WSL   receiver is a Windows process (so the phone can reach it
-//                   without a portproxy); claim.js runs in WSL. Both halves must
-//                   see the same directory, which only works under /mnt/<drive>.
-//   macOS / Linux   one process, one path form, nothing special.
+// Three shapes of install:
+//   WSL + NAT        receiver is a Windows process (so the phone can reach it
+//                    without a portproxy); claim.js runs in WSL. Both halves must
+//                    see the same directory, which only works under /mnt/<drive>.
+//   WSL + mirrored   WSL shares the host's interfaces, so the receiver runs
+//                    inside WSL like on Linux — no Windows node, no /mnt rule.
+//   macOS / Linux    one process, one path form, nothing special.
 
 const fs = require('fs');
 const os = require('os');
@@ -41,11 +43,87 @@ function winPath(p) {
   return m ? `${m[1].toUpperCase()}:\\${m[2].replace(/\//g, '\\')}` : p;
 }
 
+const POWERSHELL = '/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe';
+
+function ownIPv4() {
+  const out = [];
+  for (const addrs of Object.values(os.networkInterfaces())) {
+    for (const a of addrs || []) if (a.family === 'IPv4' && !a.internal) out.push(a.address);
+  }
+  return out;
+}
+
+// Is this WSL NAT'd, or is it on mirrored networking?
+//
+// Rather than reading networkingMode out of .wslconfig — which misses the case
+// where it was set through the WSL Settings GUI — test the property we actually
+// care about: mirrored mode means WSL *shares* the host's interfaces, so the two
+// sides report overlapping addresses. Under NAT, WSL sits on its own subnet and
+// the two lists are disjoint. That is true however the mode was configured.
+//
+// Returns 'mirrored' | 'nat' | null when Windows could not be asked.
+function detectWslNetworking() {
+  let winIPs;
+  try {
+    const raw = execFileSync(POWERSHELL, ['-NoProfile', '-Command',
+      "(Get-NetIPAddress -AddressFamily IPv4).IPAddress -join ','"],
+      { encoding: 'utf8', timeout: 15000, stdio: ['ignore', 'pipe', 'ignore'] });
+    winIPs = new Set(raw.trim().split(',').map(s => s.trim()).filter(Boolean));
+  } catch {
+    return null;
+  }
+  if (!winIPs.size) return null;
+  return ownIPv4().some(ip => winIPs.has(ip)) ? 'mirrored' : 'nat';
+}
+
 // --- 1. location + runtime -------------------------------------------------
 
 let starter;
+let wslNet = null;
 
 if (P.isWSL) {
+  // Always probe, even when .env already has a value: someone can switch WSL
+  // networking mode long after installing, and re-running this is how they'd
+  // expect that to be picked up. But a written-down value that *disagrees* with
+  // the probe is a deliberate override — say so and keep it, rather than
+  // silently undoing the fix someone applied because detection guessed wrong.
+  // config.js has folded .env into process.env, so a value here was written
+  // down rather than defaulted.
+  const pinned = String(process.env.CLAUDE_VISUAL_WSL_NET || '').toLowerCase();
+  const probed = detectWslNetworking();
+  if ((pinned === 'nat' || pinned === 'mirrored') && probed && probed !== pinned) {
+    warn(`.env says ${pinned}, but this PC looks like ${probed}. Keeping ${pinned}.`);
+    warn(`Delete CLAUDE_VISUAL_WSL_NET from .env and re-run to accept ${probed}.`);
+    wslNet = pinned;
+  } else {
+    wslNet = probed || pinned || null;
+  }
+
+  if (wslNet === 'mirrored') {
+    ok('WSL networking mode: mirrored — WSL shares this PC’s network interfaces');
+    note('so the receiver runs inside WSL, exactly like on Linux:');
+    note('no Windows-side node, and the project can live anywhere.');
+  } else if (wslNet === 'nat') {
+    ok('WSL networking mode: NAT (the default) — WSL is on its own private subnet');
+    note('so the receiver has to run on the Windows side to be reachable from the phone.');
+  } else {
+    warn('could not ask Windows for its IP list, so the networking mode is unknown.');
+    warn('Assuming NAT, which is the default and whose setup works under either mode.');
+    warn('If WSL Settings shows "Mirrored", put CLAUDE_VISUAL_WSL_NET=mirrored in .env.');
+  }
+}
+
+if (P.isWSL && wslNet === 'mirrored') {
+  // Mirrored WSL is just Linux as far as this project is concerned.
+  ok(`node ${process.version} at ${process.execPath}`);
+  starter = path.join(ROOT, 'start-server.sh');
+  try {
+    fs.chmodSync(starter, 0o755);
+    ok('start-server.sh made executable');
+  } catch {
+    warn('could not chmod start-server.sh — run it as: node server/server.js');
+  }
+} else if (P.isWSL) {
   // The receiver is a Windows process, so the project has to sit somewhere
   // Windows can see. A checkout inside the WSL filesystem fails much later,
   // confusingly, so catch it here.
@@ -90,6 +168,21 @@ if (fs.existsSync(envFile)) {
 } else {
   fs.copyFileSync(path.join(ROOT, '.env.example'), envFile);
   ok('.env created from .env.example');
+}
+
+// Record the networking mode so config.js can have it for free. Everything else
+// in .env is the user's, so rewrite only this one key and leave the rest alone.
+if (wslNet) {
+  const line = `CLAUDE_VISUAL_WSL_NET=${wslNet}`;
+  const text = fs.readFileSync(envFile, 'utf8');
+  const re = /^[ \t]*#?[ \t]*CLAUDE_VISUAL_WSL_NET=.*$/m;
+  const next = re.test(text)
+    ? text.replace(re, line)
+    : text.replace(/\n*$/, `\n\n# Detected by bin/install.js — nat | mirrored\n${line}\n`);
+  if (next !== text) {
+    fs.writeFileSync(envFile, next);
+    ok(`recorded ${line} in .env`);
+  }
 }
 
 // --- 3. the /vis command ---------------------------------------------------
@@ -214,14 +307,22 @@ WantedBy=default.target
 }
 
 if (autostart) {
+  const mirrored = P.isWSL && wslNet === 'mirrored';
   try {
-    if (P.isWSL) ok(autostartWindows());
+    if (mirrored) ok(autostartLinux());          // systemd inside WSL, not a Windows shortcut
+    else if (P.isWSL) ok(autostartWindows());
     else if (P.isMac) ok(autostartMac());
     else if (P.isLinux) ok(autostartLinux());
     else warn('no autostart method known for ' + process.platform);
   } catch (e) {
     warn('could not configure autostart: ' + e.message);
-    if (P.isLinux) warn('on a headless box you may need: loginctl enable-linger $USER');
+    if (mirrored) {
+      // WSL only runs systemd if it has been switched on explicitly.
+      warn('mirrored WSL autostarts via systemd, which WSL does not enable by default.');
+      warn('Add  [boot]\\n systemd=true  to /etc/wsl.conf, run `wsl --shutdown`, then re-run this.');
+    } else if (P.isLinux) {
+      warn('on a headless box you may need: loginctl enable-linger $USER');
+    }
     problems.push('autostart');
   }
 } else {
@@ -230,7 +331,7 @@ if (autostart) {
 
 // --- next steps ------------------------------------------------------------
 console.log('\nNext:\n');
-if (P.isWSL) {
+if (P.isWSL && wslNet !== 'mirrored') {
   console.log(`  1. Start the receiver (on Windows):   ${starter}`);
 } else {
   console.log(`  1. Start the receiver:   ${starter}`);
@@ -244,6 +345,10 @@ if (P.isMac) {
   console.log('');
 } else if (P.isLinux) {
   note(`if the phone cannot connect, open the port: sudo ufw allow ${cfg.port}/tcp`);
+  console.log('');
+} else if (P.isWSL && wslNet === 'mirrored') {
+  note('mirrored WSL is firewalled by the Windows host, so if the phone cannot connect,');
+  note(`allow inbound TCP ${cfg.port} in Windows Firewall (see the README).`);
   console.log('');
 }
 
