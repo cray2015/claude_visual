@@ -22,119 +22,210 @@ Runs on macOS, Linux and Windows + WSL. Zero dependencies, nothing leaves your n
 
 ## Installing
 
-Works on **macOS**, **Linux** and **Windows + WSL**. You need:
+Every step below is tagged with **where you do it**:
 
-- **[Claude Code](https://claude.com/claude-code)** — this installs a `/vis` slash command
-  into it. It's an extension to Claude Code, not a standalone tool.
-- **Node**, any recent version. The project has **zero dependencies**, so there is nothing to
-  `npm install`.
-- Your **phone on the same Wi-Fi** as the computer.
+| | |
+|---|---|
+| 💻 | a terminal on your computer (on Windows, this means **WSL**) |
+| 🪟 | Windows itself — File Explorer or PowerShell, *not* WSL |
+| 📱 | your phone |
 
-Windows is the only platform with a wrinkle, covered below.
+**Before you start, you need:**
 
-### Common steps
+- **[Claude Code](https://claude.com/claude-code)** — this adds a `/vis` command to it. It's an
+  extension to Claude Code, not a standalone app.
+- **Node** — any recent version, from [nodejs.org](https://nodejs.org). Nothing to
+  `npm install`; this project has zero dependencies.
+- Your **phone and computer on the same Wi-Fi**.
 
-```bash
-git clone <repo> claude_visual        # or just copy the folder
-cd claude_visual
-node bin/install.js                   # add --autostart to start it with the machine
-```
+Now follow **one** section below — whichever matches your computer. Each one is complete on
+its own, so you never need to jump between them.
 
-The installer detects the platform and adapts. It creates `.env`, and generates the `/vis`
-command at `~/.claude/commands/vis.md` pointing at *this* checkout — that file has to be
-generated rather than copied, because it contains an absolute path that differs per machine.
-It also repairs `~/.claude/commands` if it's a dangling symlink into a dotfiles repo, which
-otherwise silently stops **all** custom slash commands from loading.
+**[→ macOS](#macos)** · **[→ Linux](#linux)** · **[→ Windows + WSL](#windows--wsl)**
 
-Re-run it any time; it's idempotent, and backs up an existing `vis.md` before replacing it.
-
-Then start the receiver and note the URL it prints:
-
-```bash
-./start-server.sh                     # macOS / Linux
-```
-
-It prints one URL per network interface, best first, flagging the ones a phone can't reach
-(VPN tunnels, Docker bridges, the WSL vSwitch). Take the top one — it looks like
-`http://192.168.1.50:8765/?k=AbC123`.
-
-Finally, open that URL — **including the `?k=…` part** — in the phone's browser and install
-it to the home screen: **Share → Add to Home Screen** on iOS, **menu → Install app** on
-Android.
+---
 
 ### macOS
 
-Nothing extra. The first run triggers *"Do you want the application node to accept incoming
-network connections?"* — say **Allow**, or the phone gets a connection refused.
+Everything happens in one Terminal window until the last two steps.
 
-`--autostart` installs a LaunchAgent at `~/Library/LaunchAgents/com.claudevisual.receiver.plist`
-with `KeepAlive`, so it restarts if it ever dies. Remove it with:
+1. 💻 **Terminal** — download it and run the installer:
+
+   ```bash
+   git clone https://github.com/cray2015/claude_visual.git
+   cd claude_visual
+   node bin/install.js
+   ```
+
+2. 💻 **Terminal** — start the receiver, and **leave this running**:
+
+   ```bash
+   ./start-server.sh
+   ```
+
+   macOS will ask *"Do you want the application node to accept incoming network
+   connections?"* → click **Allow**. If you deny it, your phone gets "connection refused".
+
+   It prints a URL for each of your network addresses, best one first. Copy the **top** one.
+   It looks like `http://192.168.1.50:8765/?k=AbC123`.
+
+3. 📱 **Phone** — open that URL in your browser, **including the `?k=…` part on the end**.
+   Then **Share → Add to Home Screen** and name it `Claude`.
+
+4. 💻 **Any Claude Code session** — tap the new icon on your phone, take a photo, press
+   **Send**, then type `/vis`.
+
+That's it. To have the receiver start automatically with your Mac, re-run step 1's installer
+as `node bin/install.js --autostart`.
+
+<details>
+<summary>Removing autostart later</summary>
 
 ```bash
 launchctl unload ~/Library/LaunchAgents/com.claudevisual.receiver.plist
 rm ~/Library/LaunchAgents/com.claudevisual.receiver.plist
 ```
+</details>
+
+---
 
 ### Linux
 
-If the phone can't connect, open the port:
+Everything happens in one terminal until the last two steps.
+
+1. 💻 **Terminal** — download it and run the installer:
+
+   ```bash
+   git clone https://github.com/cray2015/claude_visual.git
+   cd claude_visual
+   node bin/install.js
+   ```
+
+2. 💻 **Terminal** — start the receiver, and **leave this running**:
+
+   ```bash
+   ./start-server.sh
+   ```
+
+   It prints a URL for each of your network addresses, best one first. Copy the **top** one.
+   It looks like `http://192.168.1.50:8765/?k=AbC123`.
+
+3. 📱 **Phone** — open that URL in your browser, **including the `?k=…` part on the end**.
+   Then add it to your home screen: **Share → Add to Home Screen** (iOS) or
+   **menu → Install app** (Android).
+
+4. 💻 **Any Claude Code session** — tap the new icon on your phone, take a photo, press
+   **Send**, then type `/vis`.
+
+If your phone can't connect, open the port:
 
 ```bash
-sudo ufw allow 8765/tcp               # or firewall-cmd --add-port=8765/tcp
+sudo ufw allow 8765/tcp          # or: firewall-cmd --add-port=8765/tcp
 ```
 
-`--autostart` installs a systemd **user** service (`~/.config/systemd/user/claude-visual.service`).
-On a machine you don't stay logged into, add `loginctl enable-linger $USER` so it survives
-logout. Remove it with:
+To start the receiver automatically, re-run the installer as `node bin/install.js --autostart`.
+
+<details>
+<summary>Removing autostart later</summary>
 
 ```bash
 systemctl --user disable --now claude-visual.service
 rm ~/.config/systemd/user/claude-visual.service
 ```
 
+On a machine you don't stay logged into, `loginctl enable-linger $USER` keeps it alive after
+logout.
+</details>
+
+---
+
 ### Windows + WSL
 
-Here the receiver runs as a **Windows** process while `/vis` runs inside WSL. That's
-deliberate: WSL2 is NAT'd, so a server started *inside* WSL isn't reachable from the phone
-without a `netsh portproxy` that breaks every time WSL's IP changes. A Windows-side process
-binds the real LAN address and just works.
+**Read this first:** two different environments are involved. You install from **WSL**, but
+the receiver runs on **Windows**. Watch the icon on each step — 💻 means WSL, 🪟 means Windows.
 
-Two consequences:
+*(Why: WSL2 sits behind its own private network, so a server started inside WSL isn't
+reachable from your phone. Running it on the Windows side avoids that entirely.)*
 
-- **Install Node for Windows too** ([nodejs.org](https://nodejs.org)), not just in WSL. The
-  installer checks for it.
-- **The project must live on a Windows drive** — `/mnt/c/...`, `/mnt/d/...` — so both halves
-  see the same files. A checkout at `~/code/` inside the WSL filesystem cannot work, and the
-  installer refuses it rather than letting it fail confusingly later.
+1. 🪟 **Windows** — install **Node for Windows** from [nodejs.org](https://nodejs.org).
+   You need Node on *both* sides; having it in WSL only is not enough.
 
-```bash
-cd /mnt/d/code && git clone <repo> claude_visual && cd claude_visual
-node bin/install.js
-```
+2. 💻 **WSL** — download it into a folder **on a Windows drive**. `/mnt/c/...` or `/mnt/d/...`
+   is required, because both halves must see the same files. A folder like `~/code/` inside
+   WSL will *not* work, and the installer will stop you:
 
-Start it by double-clicking `start-server.cmd` (not the `.sh`). `--autostart` puts a shortcut
-to `start-hidden.vbs` in `shell:startup`, which runs it with no console window.
+   ```bash
+   cd /mnt/d/code
+   git clone https://github.com/cray2015/claude_visual.git
+   cd claude_visual
+   node bin/install.js
+   ```
 
-Windows usually prompts to allow it on first run. If it didn't and the phone can't connect,
-from an **elevated** PowerShell:
+3. 🪟 **Windows** — open that same folder in **File Explorer**. Since you used `/mnt/d/code`
+   above, it's at `D:\code\claude_visual`. Double-click **`start-server.cmd`**.
+
+   A black console window opens — **leave it open**. It prints a URL for each of your network
+   addresses, best one first. Copy the **top** one. It looks like
+   `http://192.168.1.50:8765/?k=AbC123`.
+
+   Windows may ask whether to allow network access → click **Allow**.
+
+4. 📱 **Phone** — open that URL in your browser, **including the `?k=…` part on the end**.
+   Then add it to your home screen: **Share → Add to Home Screen** (iOS) or
+   **menu → Install app** (Android).
+
+5. 💻 **WSL, in any Claude Code session** — tap the new icon on your phone, take a photo,
+   press **Send**, then type `/vis`.
+
+To start the receiver automatically with Windows, re-run step 2's installer as
+`node bin/install.js --autostart`. It puts a shortcut in your Startup folder that launches the
+server with no console window.
+
+<details>
+<summary>If your phone still can't connect</summary>
+
+Windows Firewall is the usual cause. In **PowerShell run as Administrator**:
 
 ```powershell
 New-NetFirewallRule -DisplayName "claude_visual" -Direction Inbound `
   -LocalPort 8765 -Protocol TCP -Action Allow -Profile Private,Public
 ```
 
-Both profiles — home Wi-Fi is often categorized Public rather than Private. Check with
-`Get-NetConnectionProfile`.
+Both profiles, because home Wi-Fi is often categorised Public rather than Private — check
+with `Get-NetConnectionProfile`.
+</details>
 
-### Verifying
+---
 
-```bash
-curl -s http://<your-ip>:8765/health      # -> ok
-node test/netrank.test.js && node test/page-token.test.js && node test/page-tray.test.js
-```
+### Did it work?
 
-Then send a photo from the phone and type `/vis` in any Claude Code session. If `/vis` isn't
-recognised, restart Claude Code — user-level commands are picked up at session start.
+1. 💻 **Terminal / WSL** — the receiver should answer. Use the IP from the URL you copied:
+
+   ```bash
+   curl -s http://192.168.1.50:8765/health          # should print: ok
+   ```
+
+2. 📱 **Phone** — tap the icon, take a photo, press **Send**. You should see *"✓ sent"*.
+
+3. 💻 **Claude Code** — type `/vis`. Claude should describe your photo.
+
+**If `/vis` isn't recognised**, restart Claude Code — it only picks up new commands when a
+session starts. This is the most common first-run stumble.
+
+**If the phone can't load the page at all**, check: same Wi-Fi as the computer, the server
+window still open, and the firewall note in your platform's section above.
+
+<details>
+<summary>What the installer actually did</summary>
+
+It created `.env`, and generated the `/vis` command at `~/.claude/commands/vis.md` pointing at
+your copy of the project. That file is generated rather than copied because it contains an
+absolute path that differs on every machine. It also repairs `~/.claude/commands` if it's a
+broken symlink into a dotfiles repo — which otherwise silently stops *all* custom slash
+commands from loading.
+
+Re-running it is safe: it's idempotent, and backs up an existing `vis.md` first.
+</details>
 
 ### Adapting it
 
@@ -155,15 +246,12 @@ If platform detection ever guesses wrong, force it:
 | Access token | `server/token.txt`, generated on first run |
 | Inbox | `<project>/inbox` (on Windows, also reachable as the `D:\…` form of the same path) |
 
-### One-time, on the phone
+### About the phone icon
+
+*(Setting it up is step 3–4 of your platform's section above. This is background.)*
 
 Any modern mobile browser works — iOS Safari, Chrome, Firefox. Nothing here is
 Safari-specific.
-
-1. Same Wi-Fi as the computer. Open the URL — **including the `?k=…` part**.
-2. Install it to the home screen: **Share → Add to Home Screen** (iOS) or
-   **menu → Install app** (Android). Name it `Claude`.
-3. Done. Tap the icon → **Take Photo** / **Choose Photos** → then **Send**.
 
 **The token stays in the URL on purpose.** Installing saves whatever URL is showing, and on
 Android the manifest's `start_url` carries it too. If the icon ever opens to a **"paste your
