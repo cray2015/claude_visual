@@ -8,6 +8,14 @@ Replaces: shoot → cloud storage → download on the PC → find the file → c
 
 Runs on macOS, Linux and Windows + WSL. Zero dependencies, nothing leaves your network.
 
+<p align="center">
+  <img src="docs/upload-page.jpg" width="300"
+       alt="The upload page on an iPhone: Take Photo and Choose Photos buttons, an optional tag field, a staging area, and a sticky Send button.">
+</p>
+<p align="center">
+  <sub>The page you install to your home screen. Stage photos, then send them as one batch.</sub>
+</p>
+
 ---
 
 ## Installing
@@ -164,8 +172,8 @@ browsing is invisible to the installed app. Hence the token living in the URL.
 
 ## Staging, then sending
 
-Photos don't upload the moment you pick them. They land in a **tray**, and go up when you
-press **Send**:
+Photos don't upload the moment you pick them. They land in a **tray**
+([screenshot](#claude_visual)), and go up when you press **Send**:
 
 - **Take Photo** repeatedly — each shot adds to the tray, no app-switching.
 - **Choose Photos** — multi-select from the library, all added at once.

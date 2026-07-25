@@ -40,6 +40,10 @@ module.exports = function page(cfg) {
             --line:#312f2c; --accent:#d97757; --ok:#4fa287; --err:#e06c5b; }
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  /* Any author display rule beats the UA stylesheet's [hidden]{display:none},
+     so .hd{display:flex} silently defeated the attribute on the "Sent" header.
+     Guard it once here rather than per-rule. */
+  [hidden] { display: none !important; }
   body { margin:0; background:var(--bg); color:var(--fg);
          font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
          padding: max(20px, env(safe-area-inset-top)) 20px 130px; }
