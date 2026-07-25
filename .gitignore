@@ -1,0 +1,18 @@
+# Photos — never commit these.
+inbox/*
+!inbox/.gitkeep
+archive/
+
+# Local state and secrets.
+.env
+manifest.jsonl
+server/token.txt
+server/urls.txt
+server/receiver.log
+.trello-track
+*.bak
+
+# OS / editor noise.
+.DS_Store
+Thumbs.db
+node_modules/
