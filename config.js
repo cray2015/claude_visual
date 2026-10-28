@@ -124,6 +124,11 @@ module.exports = {
   host: str('CLAUDE_VISUAL_HOST', '0.0.0.0'),
   port: num('CLAUDE_VISUAL_PORT', 8765),
 
+  // A stable base URL the phone should use, e.g. a Tailscale Serve HTTPS
+  // address. When set, it is printed first and becomes the URL `/vis` hints at,
+  // so a changed LAN IP no longer strands the home-screen icon.
+  publicUrl: (str('CLAUDE_VISUAL_PUBLIC_URL', '') || '').replace(/\/+$/, '') || null,
+
   // Set to pin the access token; otherwise one is generated into server/token.txt.
   token: str('CLAUDE_VISUAL_TOKEN', null),
 

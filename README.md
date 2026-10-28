@@ -369,6 +369,7 @@ The ones you're most likely to touch:
 | `CLAUDE_VISUAL_MAX_EDGE` | `1568` | browser downscale target; 1568 is the largest edge Claude uses |
 | `CLAUDE_VISUAL_JPEG_QUALITY` | `0.85` | re-encode quality |
 | `CLAUDE_VISUAL_PORT` | `8765` | changing it changes the phone URL |
+| `CLAUDE_VISUAL_PUBLIC_URL` | *(unset)* | stable base URL for the phone, e.g. `https://<machine>.<tailnet>.ts.net:8445` behind `tailscale serve`, so a changed LAN IP doesn't break the home-screen icon. Use `https` for `*.ts.net` — Serve sends HSTS, which blocks plain `http` on every port of that host |
 | `CLAUDE_VISUAL_TOKEN` | *(generated)* | pin the token instead of using `server/token.txt` |
 
 Server-side values need a restart to take effect. `CLAUDE_VISUAL_WINDOW_MIN` is read by

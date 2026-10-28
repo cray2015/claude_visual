@@ -275,14 +275,23 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, HOST, () => {
   const list = addresses().filter(a => a.rank >= 0);
   const all = addresses();
+  const pub = cfg.publicUrl ? `${cfg.publicUrl}/?k=${TOKEN}` : null;
   const lines = list.map(a => `http://${a.ip}:${PORT}/?k=${TOKEN}`);
+  if (pub) lines.unshift(pub);
 
   console.log('');
   console.log('  claude_visual  —  listening on port ' + PORT);
   console.log('  inbox: ' + INBOX);
   console.log(`  resize: ${cfg.maxEdge}px @ q${cfg.jpegQuality}   /vis window: ${cfg.windowMin} min`);
   console.log('');
-  console.log('  Open on the iPhone (same Wi-Fi), then Share → Add to Home Screen:');
+  if (pub) {
+    console.log('  Open on the iPhone, then Share → Add to Home Screen:');
+    console.log('    ' + pub);
+    console.log('');
+    console.log('  Raw addresses (change if the network does):');
+  } else {
+    console.log('  Open on the iPhone (same Wi-Fi), then Share → Add to Home Screen:');
+  }
   const w = Math.max(...all.map(a => a.iface.length), 8);
   for (const a of all) {
     const note = a.rank < 0 ? '   (virtual — phone cannot reach this)' : '';
