@@ -1,0 +1,55 @@
+# claude_visual — architecture
+# Source of truth. Render on demand:
+#   d2 docs/architecture.d2 docs/architecture.svg
+# The rendered SVG is deliberately not committed.
+
+direction: right
+
+phone: iPhone {
+  page: "upload page: stage -> resize -> Send"
+}
+
+tsserve: "Tailscale Serve  (optional)" {
+  tls: "HTTPS on :8445, *.ts.net cert"
+}
+
+receiver: "receiver  (server/server.js)" {
+  http: "GET / open  ·  POST /upload token-gated"
+  rank: "netrank.js — picks the address to hand the phone"
+}
+
+fs: "shared filesystem  (one inbox for every project)" {
+  inbox: "inbox/ — queue: sent, not yet used"
+  archive: "archive/YYYY-MM/ — claimed"
+  manifest: "manifest.jsonl — append-only upload + claim log"
+}
+
+claim: "bin/claim.js  (the /vis command)" {
+  sel: "select: recency window | N | all | tag"
+}
+
+session: "Claude Code session"
+
+phone.page -> receiver.http: "multipart, X-Token or ?k=  (LAN / raw IP)"
+phone.page -> tsserve.tls: "same, via CLAUDE_VISUAL_PUBLIC_URL"
+tsserve.tls -> receiver.http: "proxy to 127.0.0.1:<port>"
+receiver.http -> fs.inbox: "magic-byte check, then write"
+receiver.http -> fs.manifest: "event: upload"
+claim.sel -> fs.inbox: "list pending"
+fs.inbox -> fs.archive: "claim = rename, so it leaves the queue"
+claim.sel -> fs.manifest: "event: claim"
+claim -> session: "absolute paths for the Read tool"
+
+placement: |md
+  **Where the receiver runs** — wherever it can bind the machine's
+  real LAN address, so the phone needs no portproxy:
+
+  - macOS, Linux, **mirrored** WSL — here, same host as `claim.js`.
+  - **NAT'd** WSL — as a *Windows* process. Both halves must see one
+    directory, so the checkout has to live under `/mnt/<drive>`.
+
+  **Stable phone URL** — `CLAUDE_VISUAL_PUBLIC_URL` points the phone at
+  a Tailscale Serve HTTPS front instead of a LAN IP that can change.
+  It must be https: Serve sends HSTS, which covers every port on the
+  `*.ts.net` host.
+|
